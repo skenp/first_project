@@ -10,11 +10,11 @@ print("write server adress")
 server_address = input()
 
 screen_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-km_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+mouse_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 screen_client_socket.connect((server_address,8843))
 
-km_client_socket.connect((server_address,8844))
+mouse_client_socket.connect((server_address,8844))
 print("connected")
 
 width, height = pyautogui.size() # 화면 픽셀
@@ -37,16 +37,16 @@ def screen_send():
         send_data = send_long+send_img # 길이와 이미지 결합
         screen_client_socket.send(send_data) # (바이트 길이 + 이미지) 보내기
 
-def km_receive():
+def mouse_receive():
     current_mouse_state='u'
     mouse_lmr=0
     left_middle_right=['left','middle','right']
 
     while True:
-        km_receive_data=b''
-        while len(km_receive_data)<11: #마우스 위치,클릭 여부 받기
-            km_receive_data += km_client_socket.recv(11-len(km_receive_data))
-        mouse_x, mouse_y, mouse_lmr, mouse_down = struct.unpack('>I I H ?', km_receive_data)
+        mouse_receive_data=b''
+        while len(mouse_receive_data)<11: #마우스 위치,클릭 여부 받기
+            mouse_receive_data += mouse_client_socket.recv(11-len(mouse_receive_data))
+        mouse_x, mouse_y, mouse_lmr, mouse_down = struct.unpack('>I I H ?', mouse_receive_data)
 
         pyautogui.moveTo(mouse_x, mouse_y)
 
@@ -60,5 +60,5 @@ def km_receive():
 screen_thread = threading.Thread(target=screen_send)
 screen_thread.start()
 
-km_thread = threading.Thread(target=km_receive)
-km_thread.start()
+mouse_thread = threading.Thread(target=mouse_receive)
+mouse_thread.start()
