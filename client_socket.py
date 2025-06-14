@@ -11,10 +11,12 @@ server_address = input()
 
 screen_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 mouse_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+keyboard_client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 screen_client_socket.connect((server_address,8843))
-
 mouse_client_socket.connect((server_address,8844))
+keyboard_client_socket.connect((server_address,8845))
+
 print("connected")
 
 width, height = pyautogui.size() # 화면 픽셀
@@ -41,7 +43,6 @@ def mouse_receive():
     current_mouse_state='u'
     mouse_lmr=0
     left_middle_right=['left','middle','right']
-
     while True:
         mouse_receive_data=b''
         while len(mouse_receive_data)<11: #마우스 위치,클릭 여부 받기
@@ -57,8 +58,30 @@ def mouse_receive():
             current_mouse_state = 'u'
             pyautogui.mouseUp(button=left_middle_right[mouse_lmr])
 
+def keyboard_receive():
+    buf_key=''
+    while 1:
+        key_receive_data=b''
+        while len(key_receive_data) < 4:
+            key_receive_data += keyboard_client_socket.recv(4-len(key_receive_data))
+        
+        key = struct.unpack('> I', key_receive_data)[0]
+
+        try:
+            if key == 0:
+                pyautogui.keyUp(buf_key)
+            else :
+                buf_key=chr(key)
+                pyautogui.keyDown(buf_key)
+        except:
+            1
+
+
 screen_thread = threading.Thread(target=screen_send)
 screen_thread.start()
 
 mouse_thread = threading.Thread(target=mouse_receive)
 mouse_thread.start()
+
+keyboard_thread = threading.Thread(target=keyboard_receive)
+keyboard_thread.start()
