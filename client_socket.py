@@ -26,11 +26,12 @@ send_scale = struct.pack('>I I', width, height) # 빅엔디안 unsigned int로 �
 screen_client_socket.send(send_scale) # 화면 비율 보내기
 
 def screen_send():
+    global temp_bool
     while True:
         data=pyautogui.screenshot() # 화면 캡쳐후 image객체로 생성
 
         byte_stream = io.BytesIO() # 이미지를 바이트로 인코딩
-        data.save(byte_stream, format='PNG')
+        data.save(byte_stream, format='JPEG')
         send_img = byte_stream.getvalue()
 
         how_bytes_long = len(send_img)
