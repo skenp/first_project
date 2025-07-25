@@ -5,6 +5,8 @@ import io
 import struct
 import numpy as np
 import cv2
+import zlib
+import mss
 
 pyautogui.FAILSAFE = False
 
@@ -42,64 +44,68 @@ def all_img_split_block(img, block_size_width, block_size_height): #p-frame용
     return result_arr
 
 def img_leave_proceeded_distance(img, dx, dy, start_x, start_y, block_size):#i-frame용 처리할 부분만 남기기 구하기
-    return img[max(0, start_y-dy):min(padded_height, start_y+dy+block_size), max(0, start_x-dx):min(padded_width, start_x+dx+block_size)] # 이미지에서 처리할 부분만 남기기
+    return img[max(0, start_y-dy):min(padded_height, start_y+dy+block_size),
+                max(0, start_x-dx):min(padded_width, start_x+dx+block_size)] # 이미지에서 처리할 부분만 남기기
 
-def Y_dct_and_quantization(residual_block):
-    Q_table = np.array([ 
-    [16,11,10,16,24,40,51,61],
-    [12,12,14,19,26,58,60,55],
-    [14,13,16,24,40,57,69,56],
-    [14,17,22,29,51,87,80,62],
-    [18,22,37,56,68,109,103,77],
-    [24,35,55,64,81,104,113,92],
-    [49,64,78,87,103,121,120,101],
-    [72,92,95,98,112,100,103,99]], dtype=np.float32) # 양자화 테이블 이건 정해진거 바꾸기 X (상수)
+def dct_and_quantization(residual_block, Y_or_C):
+    if Y_or_C == 'Y':
+        Q_table = np.array([ 
+        [16,11,10,16,24,40,51,61],
+        [12,12,14,19,26,58,60,55],
+        [14,13,16,24,40,57,69,56],
+        [14,17,22,29,51,87,80,62],
+        [18,22,37,56,68,109,103,77],
+        [24,35,55,64,81,104,113,92],
+        [49,64,78,87,103,121,120,101],
+        [72,92,95,98,112,100,103,99]], dtype=np.float32) # 양자화 테이블 이건 정해진거 바꾸기 X (상수)
+    elif Y_or_C == 'C':
+        Q_table = np.array([ 
+        [17,18,24,47,99,99,99,99],
+        [18,21,26,66,99,99,99,99],
+        [24,26,56,99,99,99,99,99],
+        [47,66,99,99,99,99,99,99],
+        [99,99,99,99,99,99,99,99],
+        [99,99,99,99,99,99,99,99],
+        [99,99,99,99,99,99,99,99],
+        [99,99,99,99,99,99,99,99]], dtype=np.float32) # 양자화 테이블 이건 정해진거 바꾸기 X (상수)
 
-    residual_8x8 = all_img_split_block(residual_block, 8, 8) # 16x16을 8x8로 변환
+    # residual_8x8 = all_img_split_block(residual_block, 8, 8) # 16x16을 8x8로 변환
+
     result = []
-    for j in range(len(residual_8x8)):
-        result.append(np.round(cv2.dct(residual_8x8[j][0].astype(np.float32))/Q_table)) # dct후 양자화한거 저장
-    return result
-
-def CbCr_dct_and_quantization(residual_block):
-    Q_table = np.array([ 
-    [17,18,24,47,99,99,99,99],
-    [18,21,26,66,99,99,99,99],
-    [24,26,56,99,99,99,99,99],
-    [47,66,99,99,99,99,99,99],
-    [99,99,99,99,99,99,99,99],
-    [99,99,99,99,99,99,99,99],
-    [99,99,99,99,99,99,99,99],
-    [99,99,99,99,99,99,99,99]], dtype=np.float32) # 양자화 테이블 이건 정해진거 바꾸기 X (상수)
-
-    residual_8x8 = all_img_split_block(residual_block, 8, 8) # 16x16을 8x8로 변환
-    result = []
+    for y in range(0, residual_block.shape[0], 8):
+        for x in range(0, residual_block.shape[1], 8):
+            result.append(np.round(cv2.dct(residual_block[y:y+8, x:x+8].astype(np.float32) - 128) / Q_table))
+    # for i in range(len(residual_8x8)):
+    #     result.append(np.round(cv2.dct(residual_8x8[i][0].astype(np.float32)-128)/Q_table)) # level shift후 dct후 양자화한거 저장
     
-    for j in range(len(residual_8x8)):
-        result.append(np.round(cv2.dct(residual_8x8[j][0].astype(np.float32))/Q_table)) # dct후 양자화한거 저장
     return result
 
 def temp():
+    sct = mss.mss() # mss 객체 생성
+    monitor = {"top": 0, "left": 0, "width": width, "height": height} # 화면 모니터 생성
+
     while True:
         # i-frame 보내기
-        buffer = pyautogui.screenshot()
+        buffer = np.array(sct.grab(monitor))
 
-        buf_arr = np.array(buffer) # i-frame
+        buf_arr = buffer[:, :, :3] # i-frame 필요없는 alpha 짤라내기
         # block_size의 배수로 padding
         buf_arr = np.pad(buf_arr, ((0, padded_height-height), (0,padded_width-width), (0,0)), 'constant', constant_values=0)
-        YCrCb_buf_arr = cv2.cvtColor(buf_arr, cv2.COLOR_RGB2YCrCb) # YCrCb 변환
+        YCrCb_buf_arr = cv2.cvtColor(buf_arr, cv2.COLOR_BGR2YCrCb) # YCrCb 변환
         Y_buf_arr, Cr_buf_arr, Cb_buf_arr = cv2.split(YCrCb_buf_arr)
+        buffer = (Y_buf_arr, Cr_buf_arr, Cb_buf_arr)
 
-        Cb_buf_subsemplited = cv2.resize(Cb_buf_arr, (padded_width//2, padded_height), interpolation=cv2.INTER_AREA)
-        Cr_buf_subsemplited = cv2.resize(Cr_buf_arr, (padded_width//2, padded_height), interpolation=cv2.INTER_AREA)
+        Cb_buf_subsemplited=Cb_buf_arr # 4:4:4로 일단
+        Cr_buf_subsemplited=Cr_buf_arr
 
-        result_Y = Y_dct_and_quantization(Y_buf_arr)
-        result_Cb = CbCr_dct_and_quantization(Cb_buf_subsemplited)
-        result_Cr = CbCr_dct_and_quantization(Cr_buf_subsemplited)
 
-        send_result_Y = np.stack(result_Y).astype(np.int16).tobytes()
-        send_result_Cb = np.stack(result_Cb).astype(np.int16).tobytes()
-        send_result_Cr = np.stack(result_Cr).astype(np.int16).tobytes()
+        result_Y = dct_and_quantization(Y_buf_arr, Y_or_C='Y')
+        result_Cb = dct_and_quantization(Cb_buf_subsemplited, Y_or_C='C')
+        result_Cr = dct_and_quantization(Cr_buf_subsemplited, Y_or_C='C')
+
+        send_result_Y = zlib.compress(np.stack(result_Y).astype(np.int16).tobytes())
+        send_result_Cb = zlib.compress(np.stack(result_Cb).astype(np.int16).tobytes())
+        send_result_Cr = zlib.compress(np.stack(result_Cr).astype(np.int16).tobytes())
 
         send_img = send_result_Y + send_result_Cb + send_result_Cr
 
@@ -117,29 +123,23 @@ def temp():
 
         # p-frame 보내기
         for k in range(15):
-            data=pyautogui.screenshot() # 화면 캡쳐후 image객체로 생성
-
+            data=np.array(sct.grab(monitor)) # 화면 캡쳐 객체로 생성
             # frame 생성 작업
-            img_arr = np.array(data)  # p-frame
+            img_arr = data[:, :, :3]  # p-frame alpha 짤라내기
             # block_size의 배수로 padding
             img_arr = np.pad(img_arr, ((0, padded_height-height), (0,padded_width-width), (0,0)), 'constant', constant_values=0)
-            YCrCb_img_arr = cv2.cvtColor(img_arr, cv2.COLOR_RGB2YCrCb) # YCrCb로 변환값
+            YCrCb_img_arr = cv2.cvtColor(img_arr, cv2.COLOR_BGR2YCrCb) # YCrCb로 변환값
             Y_img_arr, Cr_img_arr, Cb_img_arr = cv2.split(YCrCb_img_arr)
 
-            # 4:2:2 비율로 서브샘플링
-            Cb_img_subsemplited = cv2.resize(Cb_img_arr, (padded_width//2, padded_height), interpolation=cv2.INTER_AREA)
-            Cr_img_subsemplited = cv2.resize(Cr_img_arr, (padded_width//2, padded_height), interpolation=cv2.INTER_AREA)
+            # 일단 4:4:4
+            Cb_img_subsemplited = Cb_img_arr
+            Cr_img_subsemplited = Cr_img_arr
 
+            Y_buf_arr, Cr_buf_arr, Cb_buf_arr = buffer # buffer 값 불러오기
 
-            buf_arr = np.array(buffer) # i-frame
-            # block_size의 배수로 padding
-            buf_arr = np.pad(buf_arr, ((0, padded_height-height), (0,padded_width-width), (0,0)), 'constant', constant_values=0)
-            YCrCb_buf_arr = cv2.cvtColor(buf_arr, cv2.COLOR_RGB2YCrCb) # YCrCb 변환
-            Y_buf_arr, Cr_buf_arr, Cb_buf_arr = cv2.split(YCrCb_buf_arr)
-
-            # 4:2:2 비율로 서브샘플링
-            Cb_buf_subsemplited = cv2.resize(Cb_buf_arr, (padded_width//2, padded_height), interpolation=cv2.INTER_AREA)
-            Cr_buf_subsemplited = cv2.resize(Cr_buf_arr, (padded_width//2, padded_height), interpolation=cv2.INTER_AREA)
+            # 일단 4:4:4
+            Cb_buf_subsemplited = Cb_buf_arr
+            Cr_buf_subsemplited = Cr_buf_arr
 
             result_Y = [] # Y 압축 결과
             result_Cb = [] # Cb 압축 결과
@@ -147,18 +147,16 @@ def temp():
             best_dx_dy = [] # SAD값이 가장 작은 블록의 dx, dy
 
             p_blocks = all_img_split_block(Y_img_arr, block_size, block_size) # 이미지 블록들 (Y)
-            Cb_p_blocks = all_img_split_block(Cb_img_subsemplited, block_size//2, block_size)
-            Cr_p_blocks = all_img_split_block(Cr_img_subsemplited, block_size//2, block_size)
+            Cb_p_blocks = all_img_split_block(Cb_img_subsemplited, block_size, block_size)
+            Cr_p_blocks = all_img_split_block(Cr_img_subsemplited, block_size, block_size)
 
-            i=0
-            for p_block, start_p_x_pos, start_p_y_pos in p_blocks: # p-blcok 블록마다 하는거임
+            for i, (p_block, start_p_x_pos, start_p_y_pos) in enumerate(p_blocks): # p-blcok 블록마다 하는거임
                 #잔차 과정(1)
-                start_i_x_pos = max(0, start_p_x_pos-block_size)
-                start_i_y_pos = max(0, start_p_y_pos-block_size)
+                start_i_x_pos = max(0, start_p_x_pos-16)
+                start_i_y_pos = max(0, start_p_y_pos-16)
 
                 # i_blocks에 형태 [가능한 모든 블록](이미지, dx, dy)
                 i_area = img_leave_proceeded_distance(Y_buf_arr, 16, 16, start_p_x_pos, start_p_y_pos, block_size) # p-frame의 시작점 기준 16거리안에서 i-frame블록 생성
-
 
                 # SSD값이 가장 작은거 구하기 (범위는 탐색 범위 안)
                 best_x, best_y = cv2.minMaxLoc(cv2.matchTemplate(i_area, p_block, cv2.TM_SQDIFF))[2] # 최적 블록 시작좌표
@@ -170,29 +168,24 @@ def temp():
                 # Y 잔차
                 Y_residual = (p_block - i_area[best_y:best_y+block_size, best_x:best_x+block_size])
 
-                # C기준 
-                C_x, C_y = (Cb_p_blocks[i][1] - round(dx/2)), i_y # C기준 i-frame 좌표
+                #Cb, Cr 잔차 
+                Cb_residual = (Cb_p_blocks[i][0] - Cb_buf_subsemplited[i_y:i_y+block_size, i_x:i_x+block_size])
+                Cr_residual = (Cr_p_blocks[i][0] - Cr_buf_subsemplited[i_y:i_y+block_size, i_x:i_x+block_size])
 
-                # Cb, Cr 잔차
-                Cb_residual = (Cb_p_blocks[i][0] - Cb_buf_subsemplited[C_y:C_y+block_size, C_x:C_x+block_size//2])
-                Cr_residual = (Cr_p_blocks[i][0] - Cr_buf_subsemplited[C_y:C_y+block_size, C_x:C_x+block_size//2])
 
                 # dct, 양자화 과정(2)
-                result_Y.extend(Y_dct_and_quantization(Y_residual))
-                result_Cb.extend(CbCr_dct_and_quantization(Cb_residual))
-                result_Cr.extend(CbCr_dct_and_quantization(Cr_residual))
+                result_Y.extend(dct_and_quantization(Y_residual, Y_or_C='Y'))
+                result_Cb.extend(dct_and_quantization(Cb_residual, Y_or_C='C'))
+                result_Cr.extend(dct_and_quantization(Cr_residual, Y_or_C='C'))
 
-                i+=1
             # 보낼 데이터 int16, bytes형
             numpy_dx_dy = np.array(best_dx_dy)
-            send_dx_dy = numpy_dx_dy.astype(np.int16).tobytes()
-            send_result_Y = np.stack(result_Y).astype(np.int16).tobytes()
-            send_result_Cb = np.stack(result_Cb).astype(np.int16).tobytes()
-            send_result_Cr = np.stack(result_Cr).astype(np.int16).tobytes()
+            send_dx_dy = zlib.compress(numpy_dx_dy.astype(np.int16).tobytes())
+            send_result_Y = zlib.compress(np.stack(result_Y).astype(np.int16).tobytes())
+            send_result_Cb = zlib.compress(np.stack(result_Cb).astype(np.int16).tobytes())
+            send_result_Cr = zlib.compress(np.stack(result_Cr).astype(np.int16).tobytes())
 
             send_img = send_dx_dy+send_result_Y+send_result_Cb+send_result_Cr
-
-
 
             how_Y_elements_are = len(result_Y)
             how_Cb_elements_are = len(result_Cb)
@@ -206,7 +199,7 @@ def temp():
             send_data = send_long+send_img # 길이와 이미지 결합
             screen_client_socket.send(send_data) # (바이트 길이 + 이미지) 보내기
 
-            buffer = data
+            buffer = (Y_buf_arr, Cr_buf_arr, Cb_buf_arr)
 
 
 
