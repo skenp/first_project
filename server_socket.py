@@ -72,10 +72,7 @@ def screen_get(): # 화면받는 함수, pygame 이벤트 처리
     pygame.init()
     clock = pygame.time.Clock()
 
-    global mouse_down
-    global mouse_lmr
-    global mouse_move
-    global keyboard_input
+    global mouse_down, mouse_lmr, mouse_move, keyboard_input
 
     while 1:
         clock.tick(fps)
@@ -123,9 +120,7 @@ def screen_get(): # 화면받는 함수, pygame 이벤트 처리
         pygame.display.update()
 
 def mouse_send():
-    global mouse_down
-    global mouse_lmr
-    global mouse_move
+    global mouse_down, mouse_lmr, mouse_move
 
     current_mouse_change = [mouse_down, mouse_lmr]
     while 1:
