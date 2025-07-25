@@ -1,8 +1,10 @@
-import socket
+import socket # 패딩 해야함
 import pyautogui
 import threading
 import io
 import struct
+import numpy as np
+import cv2
 
 pyautogui.FAILSAFE = False
 
@@ -26,7 +28,6 @@ send_scale = struct.pack('>I I', width, height) # 빅엔디안 unsigned int로 �
 screen_client_socket.send(send_scale) # 화면 비율 보내기
 
 def screen_send():
-    global temp_bool
     while True:
         data=pyautogui.screenshot() # 화면 캡쳐후 image객체로 생성
 
