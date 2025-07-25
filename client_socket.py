@@ -3,8 +3,6 @@ import pyautogui
 import threading
 import io
 import struct
-import numpy as np
-import cv2
 
 pyautogui.FAILSAFE = False
 
