@@ -1,4 +1,4 @@
-import socket # 패딩 해야함
+import socket
 import pyautogui
 import threading
 import io
@@ -80,8 +80,8 @@ def keyboard_receive():
 screen_thread = threading.Thread(target=screen_send)
 screen_thread.start()
 
-mouse_thread = threading.Thread(target=mouse_receive)
+mouse_thread = threading.Thread(target=mouse_receive, daemon=True)
 mouse_thread.start()
 
-keyboard_thread = threading.Thread(target=keyboard_receive)
+keyboard_thread = threading.Thread(target=keyboard_receive, daemon=True)
 keyboard_thread.start()
