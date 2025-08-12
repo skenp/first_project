@@ -169,8 +169,8 @@ def keyboard_send():
 screen_thread = threading.Thread(target=screen_get)
 screen_thread.start()
 
-mouse_thread = threading.Thread(target=mouse_send)
+mouse_thread = threading.Thread(target=mouse_send, daemon=True)
 mouse_thread.start()
 
-keyboard_thread = threading.Thread(target=keyboard_send)
+keyboard_thread = threading.Thread(target=keyboard_send, daemon=True)
 keyboard_thread.start()
