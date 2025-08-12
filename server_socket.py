@@ -7,8 +7,11 @@ import threading
 import struct
 import os
 import time
-os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1' # pygame 출력 가리
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1' # pygame 출력 가리기
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 import pygame
+
 
 my_ip = socket.gethostbyname(socket.gethostname()) # 내 아이피
 
@@ -67,7 +70,7 @@ mouse_move = False
 keyboard_input = 0
 
 def screen_get(): # 화면받는 함수, pygame 이벤트 처리
-    screen = pygame.display.set_mode((width_scale, height_scale))
+    screen = pygame.display.set_mode((my_width, my_height))
     pygame.display.set_caption("screen sharing")
     pygame.init()
     clock = pygame.time.Clock()
