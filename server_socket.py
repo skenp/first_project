@@ -11,9 +11,11 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1' # pygame 출력 가리기
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 import pygame
+import zlib
 
 
-my_ip = socket.gethostbyname(socket.gethostname()) # 내 아이피
+# my_ip = socket.gethostbyname(socket.gethostname()) # 내 아이피
+my_ip = "0.0.0.0"
 
 screen_server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM) # 화면 받는 소켓 생성
 screen_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -33,7 +35,7 @@ keyboard_server_socket.bind((my_ip, 8845))
 screen_server_socket.listen() # 소켓 기다리기
 mouse_server_socket.listen()
 keyboard_server_socket.listen()
-print(my_ip+' socket waiting')
+print(socket.gethostbyname(socket.gethostname())+' socket waiting')
 
 screen_client_socket, client_address = screen_server_socket.accept() # 요청 받기
 mouse_client_socket, client_address = mouse_server_socket.accept()
@@ -61,7 +63,7 @@ else:
     width_scale = receive_width*correction
     height_scale = my_height
 
-fps=10
+fps=30
 
 mouse_down = False
 mouse_lmr = False
@@ -108,12 +110,13 @@ def screen_get(): # 화면받는 함수, pygame 이벤트 처리
             header+=screen_client_socket.recv(4-len(header))
         real_long=struct.unpack('>I', header)[0]
         
-
+        print(real_long)
         receive_data=b'' 
         while len(receive_data)<real_long: # 데이터 길이 만큼 받기
             receive_data+=screen_client_socket.recv(real_long-len(receive_data)) 
-
-        io_data = io.BytesIO(receive_data) # 이미지 디코딩
+        
+        decompress_data = zlib.decompress(receive_data)
+        io_data = io.BytesIO(decompress_data) # 이미지 디코딩
         PIL_img = Image.open(io_data)
         
         pygame_img = pygame.image.fromstring(PIL_img.tobytes(), PIL_img.size, PIL_img.mode) # PIL이미지 pygame으로 변환
@@ -131,7 +134,6 @@ def mouse_send():
 
         mouse_x = int(mouse_x / correction) # 마우스 위치 조절
         mouse_y = int(mouse_y / correction) 
-        
 
         send_mouse_pos = struct.pack('>I I H ?', mouse_x, mouse_y, mouse_lmr, mouse_down) # 보내기
 
@@ -148,22 +150,17 @@ def keyboard_send():
     global keyboard_input
     key_down_send = False
 
-    while(True):
+    while 1:
         current_key = keyboard_input
         send_key = struct.pack('> I', current_key)
 
         if current_key!=0 and key_down_send == False: # 키보드 입력시만 보내기 그리고 꾹 누르고 있으면 보내지 않기
             keyboard_client_socket.send(send_key)
             key_down_send = True
-            print('first ',end='')
-            print(current_key)
 
         elif current_key==0 and key_down_send == True: # 키를 때면 전송
             keyboard_client_socket.send(send_key) # 0전송 -> 키 올리라는 명령 전송
             key_down_send = False
-            print('second ',end='')
-            print(current_key)
-        time.sleep(0.05)
 
 
 screen_thread = threading.Thread(target=screen_get)
