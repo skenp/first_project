@@ -1,2 +1,4 @@
 Pillow
 pytautogui
+numpy
+opencv-python
