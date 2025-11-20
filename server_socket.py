@@ -11,7 +11,8 @@ os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = '1' # pygame 출력 가리기
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 import pygame
-import zlib
+import numpy as np
+import cv2
 
 
 # my_ip = socket.gethostbyname(socket.gethostname()) # 내 아이피
@@ -115,11 +116,13 @@ def screen_get(): # 화면받는 함수, pygame 이벤트 처리
         while len(receive_data)<real_long: # 데이터 길이 만큼 받기
             receive_data+=screen_client_socket.recv(real_long-len(receive_data)) 
         
-        decompress_data = zlib.decompress(receive_data)
-        io_data = io.BytesIO(decompress_data) # 이미지 디코딩
-        PIL_img = Image.open(io_data)
-        
-        pygame_img = pygame.image.fromstring(PIL_img.tobytes(), PIL_img.size, PIL_img.mode) # PIL이미지 pygame으로 변환
+        nparr = np.frombuffer(receive_data, np.uint8) # 디코딩
+        img_array = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB) # RGB로
+
+        pygame_img = pygame.surfarray.make_surface(np.transpose(img_array, (1, 0, 2)))
+
         show_img = pygame.transform.scale(pygame_img, (width_scale, height_scale))
         
         screen.blit(show_img, (0,0))
