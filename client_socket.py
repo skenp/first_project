@@ -3,6 +3,9 @@ import pyautogui
 import threading
 import io
 import struct
+import zlib
+import numpy as np
+import cv2
 
 pyautogui.FAILSAFE = False
 
@@ -29,14 +32,18 @@ def screen_send():
     while True:
         data=pyautogui.screenshot() # 화면 캡쳐후 image객체로 생성
 
-        byte_stream = io.BytesIO() # 이미지를 바이트로 인코딩
-        data.save(byte_stream, format='JPEG')
-        send_img = byte_stream.getvalue()
+        img_array = np.array(data) # RGB numpy로 저장
+            
+        img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR) # BGR로 변환
+
+        # JPEG로 압축
+        encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]  # 품질 60
+        send_img = cv2.imencode('.jpg', img_array, encode_param)[1].tobytes()
 
         how_bytes_long = len(send_img)
         send_long = struct.pack('>I', how_bytes_long) # 빅엔디안 unsigned int로 바이트화
 
-        send_data = send_long+send_img # 길이와 이미지 결합
+        send_data = send_long+send_img # 이미지와 길이를 결합
         screen_client_socket.send(send_data) # (바이트 길이 + 이미지) 보내기
 
 def mouse_receive():
