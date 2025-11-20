@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="pygame.pkgdata")
 import pygame
 import numpy as np
 import cv2
+import zlib
 
 
 # my_ip = socket.gethostbyname(socket.gethostname()) # 내 아이피
@@ -115,8 +116,9 @@ def screen_get(): # 화면받는 함수, pygame 이벤트 처리
         receive_data=b'' 
         while len(receive_data)<real_long: # 데이터 길이 만큼 받기
             receive_data+=screen_client_socket.recv(real_long-len(receive_data)) 
-        
-        nparr = np.frombuffer(receive_data, np.uint8) # 디코딩
+
+        nparr = zlib.decompress(receive_data) 
+        nparr = np.frombuffer(nparr, np.uint8) # 디코딩
         img_array = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         img_array = cv2.cvtColor(img_array, cv2.COLOR_BGR2RGB) # RGB로
