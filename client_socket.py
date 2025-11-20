@@ -6,6 +6,7 @@ import struct
 import zlib
 import numpy as np
 import cv2
+import zlib
 
 pyautogui.FAILSAFE = False
 
@@ -39,6 +40,7 @@ def screen_send():
         # JPEG로 압축
         encode_param = [int(cv2.IMWRITE_JPEG_QUALITY), 60]  # 품질 60
         send_img = cv2.imencode('.jpg', img_array, encode_param)[1].tobytes()
+        send_img = zlib.compress(send_img)
 
         how_bytes_long = len(send_img)
         send_long = struct.pack('>I', how_bytes_long) # 빅엔디안 unsigned int로 바이트화
